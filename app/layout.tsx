@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -14,7 +15,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <head />
+      <body>
+        <GoogleOAuthProvider clientId="657866848379-tpnj8ch0s8qpoeg288nble6uja7bhh3c.apps.googleusercontent.com">
+          {children}
+        </GoogleOAuthProvider>
+      </body>
     </html>
   )
 }

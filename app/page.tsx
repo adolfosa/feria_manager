@@ -1,29 +1,42 @@
 "use client"
 
-import { useState } from "react"
+import { GoogleLogin, CredentialResponse } from "@react-oauth/google"
+import { jwtDecode } from "jwt-decode"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
+// Tipo para los datos decodificados del token
+interface GoogleJwtPayload {
+  sub: string
+  name: string
+  email: string
+  picture: string
+}
+
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleGoogleLogin = async () => {
-    setIsLoading(true)
+  const handleSuccess = (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      alert("Token inválido")
+      return
+    }
 
-    // Simular autenticación con Google
-    setTimeout(() => {
-      const userData = {
-        uid: "user123",
-        nombre: "Danae",
-        email: "danae@gmail.com",
-        foto_url: "/placeholder.svg?height=60&width=60",
-      }
+    const decoded = jwtDecode<GoogleJwtPayload>(credentialResponse.credential)
 
-      localStorage.setItem("user", JSON.stringify(userData))
-      router.push("/dashboard")
-    }, 2000)
+    const userData = {
+      uid: decoded.sub,
+      nombre: decoded.name,
+      email: decoded.email,
+      foto_url: decoded.picture,
+    }
+
+    localStorage.setItem("user", JSON.stringify(userData))
+    router.push("/dashboard")
+  }
+
+  const handleError = () => {
+    alert("Error al iniciar sesión con Google")
   }
 
   return (
@@ -47,24 +60,9 @@ export default function LoginPage() {
             <p className="text-gray-500">Inicia sesión para comenzar</p>
           </CardHeader>
           <CardContent className="space-y-6">
-            <Button
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-              className="w-full h-14 text-lg font-semibold bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg"
-              size="lg"
-            >
-              {isLoading ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Iniciando sesión...</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">📱</span>
-                  <span>Entrar con Google</span>
-                </div>
-              )}
-            </Button>
+            <div className="flex justify-center">
+              <GoogleLogin onSuccess={handleSuccess} onError={handleError} />
+            </div>
 
             <div className="text-center">
               <p className="text-sm text-gray-500 leading-relaxed">
