@@ -16,8 +16,8 @@ export default function LoginPage() {
     setTimeout(() => {
       const userData = {
         uid: "user123",
-        nombre: "Fran",
-        email: "fran@gmail.com",
+        nombre: "Danae",
+        email: "danae@gmail.com",
         foto_url: "/placeholder.svg?height=60&width=60",
       }
 
