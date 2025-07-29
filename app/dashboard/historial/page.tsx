@@ -17,6 +17,11 @@ interface Pedido {
   estado: "Pendiente" | "Entregado" | "Cancelado"
 }
 
+const formatearFecha = (fecha: string) => {
+  const [year, month, day] = fecha.split("-")
+  return `${day}-${month}-${year}`
+}
+
 export default function HistorialPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [clientes, setClientes] = useState<any[]>([])
@@ -192,7 +197,7 @@ export default function HistorialPage() {
                     </div>
                     <div className="flex items-center gap-2 text-gray-600">
                       <span>📅</span>
-                      <span>{new Date(pedido.fechaEntrega).toLocaleDateString()}</span>
+                      <span>Entrega: {formatearFecha(pedido.fechaEntrega)}</span>
                     </div>
                   </CardContent>
                 </Card>
