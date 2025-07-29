@@ -29,17 +29,28 @@ export default function NuevoPedidoPage() {
     if (clientesGuardados) setClientes(JSON.parse(clientesGuardados))
     if (productosGuardados) setProductos(JSON.parse(productosGuardados))
 
-    // Establecer fecha por defecto (mañana)
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    setFormData((prev) => ({
-      ...prev,
-      fechaEntrega: tomorrow.toISOString().split("T")[0],
-    }))
+    // Establecer fecha actual por defecto si aún no se ha definido
+    setFormData((prev) => {
+      if (prev.fechaEntrega) return prev
+      const today = new Date()
+      return {
+        ...prev,
+        fechaEntrega: today.toISOString().split("T")[0],
+      }
+    })
   }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    const fechaSeleccionada = new Date(formData.fechaEntrega)
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0) // resetear hora
+
+    if (fechaSeleccionada < hoy) {
+      alert("La fecha de entrega no puede estar en el pasado.")
+      return
+    }
 
     const cliente = clientes.find((c) => c.id === formData.clienteId)
     const producto = productos.find((p) => p.id === formData.productoId)
@@ -55,7 +66,7 @@ export default function NuevoPedidoPage() {
       fechaEntrega: formData.fechaEntrega,
       estado: "Pendiente",
     }
-
+    console.log("Fecha a guardar:", formData.fechaEntrega)
     localStorage.setItem("pedidos", JSON.stringify([...pedidos, nuevoPedido]))
     router.push("/dashboard/pedidos")
   }
