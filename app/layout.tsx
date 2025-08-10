@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata } from "next"
 import { GoogleOAuthProvider } from "@react-oauth/google"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <GoogleOAuthProvider clientId={clientId}>
           {children}
+          <Toaster richColors closeButton />
         </GoogleOAuthProvider>
       </body>
     </html>

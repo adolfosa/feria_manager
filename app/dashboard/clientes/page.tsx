@@ -1,45 +1,85 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { MobileClientDialog } from "@/components/mobile-client-dialog"
+import type { Cliente } from "@/types/cliente"// arriba de tu archivo
+import { toast } from "sonner"
 
-interface Cliente {
-  id: string
-  nombre: string
-  telefono: string
-  direccion: string
-}
 
 export default function ClientesPage() {
+  const router = useRouter()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [filtro, setFiltro] = useState("")
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const loadClientes = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch("/api/clientes")
+      if (res.status === 401) return router.replace("/")
+      if (!res.ok) throw new Error("Error al obtener clientes")
+      const data = (await res.json()) as Cliente[]
+      setClientes(data)
+    } catch (e) {
+      console.error(e)
+      alert("No se pudieron cargar los clientes")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const clientesGuardados = localStorage.getItem("clientes")
-    if (clientesGuardados) {
-      setClientes(JSON.parse(clientesGuardados))
-    }
+    loadClientes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const clientesFiltrados = clientes.filter(
-    (cliente) => cliente.nombre.toLowerCase().includes(filtro.toLowerCase()) || cliente.telefono.includes(filtro),
+    (c) =>
+      c.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
+      (c.telefono ?? "").includes(filtro)
   )
 
-  const contarPedidosCliente = (clienteId: string) => {
+  const contarPedidosCliente = (clienteId: number) => {
+    // aún cuentas desde localStorage hasta migrar 'pedidos' a la API
     const pedidos = JSON.parse(localStorage.getItem("pedidos") || "[]")
-    return pedidos.filter((p: any) => p.clienteId === clienteId).length
+    return pedidos.filter((p: any) => String(p.clienteId) === String(clienteId)).length
   }
 
-  const eliminarCliente = (id: string) => {
-    const clientesActualizados = clientes.filter((c) => c.id !== id)
-    localStorage.setItem("clientes", JSON.stringify(clientesActualizados))
-    setClientes(clientesActualizados)
+  const eliminarCliente = async (id: number) => {
+    const cliente = clientes.find(c => c.id === id)
+    const nombre = cliente?.nombre ?? "cliente"
+
+    const ok = confirm(`¿Eliminar a ${nombre}?`)
+    if (!ok) {
+      toast.info("Eliminación cancelada")
+      return
+    }
+
+    const t = toast.loading("Eliminando…")
+
+    try {
+      const res = await fetch(`/api/clientes/${id}`, { method: "DELETE" })
+      if (res.status === 401) {
+        toast.error("Sesión expirada", { id: t })
+        return router.replace("/")
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? "No se pudo eliminar")
+      }
+
+      setClientes(prev => prev.filter(c => c.id !== id))
+      toast.success(`Eliminado: ${nombre}`, { id: t })
+    } catch (e: any) {
+      toast.error(e?.message || "Error de red al eliminar", { id: t })
+    }
   }
 
   return (
@@ -76,11 +116,20 @@ export default function ClientesPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between px-2">
           <h2 className="text-lg font-semibold text-gray-700">
-            {clientesFiltrados.length} cliente{clientesFiltrados.length !== 1 ? "s" : ""}
+            {loading ? "Cargando..." : `${clientesFiltrados.length} cliente${clientesFiltrados.length !== 1 ? "s" : ""}`}
           </h2>
         </div>
 
-        {clientesFiltrados.length === 0 ? (
+        {loading ? (
+          <Card className="text-center py-12 bg-gray-50">
+            <CardContent>
+              <div className="animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/3 mx-auto mb-3" />
+                <div className="h-6 bg-gray-200 rounded w-1/2 mx-auto" />
+              </div>
+            </CardContent>
+          </Card>
+        ) : clientesFiltrados.length === 0 ? (
           <Card className="text-center py-12 bg-gray-50">
             <CardContent>
               <div className="text-6xl mb-4">🤷‍♀️</div>
@@ -128,11 +177,7 @@ export default function ClientesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        if (confirm(`¿Eliminar a ${cliente.nombre}?`)) {
-                          eliminarCliente(cliente.id)
-                        }
-                      }}
+                      onClick={() => eliminarCliente(cliente.id)}
                       className="h-10 border-red-200 text-red-700 hover:bg-red-50"
                     >
                       🗑️
@@ -147,17 +192,38 @@ export default function ClientesPage() {
 
       {/* Dialog para editar */}
       {selectedCliente && (
-        <MobileClientDialog
-          cliente={selectedCliente}
-          onClose={() => setSelectedCliente(null)}
-          onSave={(clienteActualizado) => {
-            const clientesActualizados = clientes.map((c) => (c.id === selectedCliente.id ? clienteActualizado : c))
-            localStorage.setItem("clientes", JSON.stringify(clientesActualizados))
-            setClientes(clientesActualizados)
+      <MobileClientDialog
+        cliente={selectedCliente}
+        onClose={() => setSelectedCliente(null)}
+        onSave={async (cActualizado) => {
+          try {
+            const res = await fetch(`/api/clientes/${selectedCliente.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                nombre: cActualizado.nombre?.trim() ?? "",
+                telefono: cActualizado.telefono ?? null,
+                direccion: cActualizado.direccion ?? null,
+              }),
+            })
+            if (res.status === 401) return router.replace("/")
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}))
+              alert(err.error ?? "No se pudo actualizar")
+              return
+            }
+            // ✅ cActualizado no trae id → no rompe el tipo
+            setClientes(prev =>
+              prev.map(c => (c.id === selectedCliente.id ? { ...c, ...cActualizado } : c))
+            )
             setSelectedCliente(null)
-          }}
-        />
-      )}
+          } catch (e) {
+            console.error(e)
+            alert("Error de red al actualizar")
+          }
+        }}
+      />
+    )}
     </div>
   )
 }
