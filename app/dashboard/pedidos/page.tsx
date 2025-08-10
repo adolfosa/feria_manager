@@ -5,17 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-
-interface Pedido {
-  id: string
-  clienteId: string
-  clienteNombre: string
-  productoId: string
-  productoNombre: string
-  cantidad: number
-  fechaEntrega: string
-  estado: "Pendiente" | "Entregado" | "Cancelado"
-}
+import type { Pedido } from "@/types/pedido"
 
 const formatearFecha = (fecha: string) => {
   const [year, month, day] = fecha.split("-")

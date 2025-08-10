@@ -5,17 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-
-interface Pedido {
-  id: string
-  clienteId: string
-  clienteNombre: string
-  productoId: string
-  productoNombre: string
-  cantidad: number
-  fechaEntrega: string
-  estado: "Pendiente" | "Entregado" | "Cancelado"
-}
+import type { Pedido } from "@/types/pedido"
 
 const formatearFecha = (fecha: string) => {
   const [year, month, day] = fecha.split("-")

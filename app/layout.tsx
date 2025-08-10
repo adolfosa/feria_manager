@@ -4,7 +4,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Feria Manager',
-  description: 'Created with v0',
+  description: 'Configura y gestiona tu negocio de forma sencilla',
   generator: 'v0.dev',
 }
 

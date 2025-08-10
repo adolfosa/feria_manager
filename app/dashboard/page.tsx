@@ -4,9 +4,15 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import type { Pedido } from "@/types/pedido"
+interface User {
+    nombre: string
+    // agrega otros campos si los usas (email, rol, etc.)
+  }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState(null)
+
+  const [user, setUser] = useState<User | null>(null)
   const [stats, setStats] = useState({
     clientes: 0,
     productos: 0,
@@ -15,18 +21,17 @@ export default function DashboardPage() {
   })
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
+  const userData = localStorage.getItem("user")
     if (userData) {
-      setUser(JSON.parse(userData))
+      setUser(JSON.parse(userData) as User)
     }
 
-    // Cargar estadísticas
-    const clientes = JSON.parse(localStorage.getItem("clientes") || "[]")
-    const productos = JSON.parse(localStorage.getItem("productos") || "[]")
-    const pedidos = JSON.parse(localStorage.getItem("pedidos") || "[]")
+    const clientes = JSON.parse(localStorage.getItem("clientes") || "[]") as unknown[]
+    const productos = JSON.parse(localStorage.getItem("productos") || "[]") as unknown[]
+    const pedidos = JSON.parse(localStorage.getItem("pedidos") || "[]") as Pedido[]
 
-    const pedidosPendientes = pedidos.filter((p) => p.estado === "Pendiente").length
-    const pedidosEntregados = pedidos.filter((p) => p.estado === "Entregado").length
+    const pedidosPendientes = pedidos.filter((p: Pedido) => p.estado === "Pendiente").length
+    const pedidosEntregados = pedidos.filter((p: Pedido) => p.estado === "Entregado").length
 
     setStats({
       clientes: clientes.length,
@@ -36,11 +41,12 @@ export default function DashboardPage() {
     })
   }, [])
 
+  const saludo = user?.nombre ? user.nombre.split(" ")[0] : "Usuario"
+
   return (
-    <div className="space-y-6">
-      {/* Saludo personalizado */}
+   <div className="space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold text-gray-800">¡Hola, {user?.nombre?.split(" ")[0] || "Usuario"}! 👋</h1>
+        <h1 className="text-2xl font-bold text-gray-800">¡Hola, {saludo}! 👋</h1>
         <p className="text-gray-600">¿Qué quieres hacer hoy?</p>
       </div>
 
