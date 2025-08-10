@@ -16,22 +16,26 @@ interface GoogleJwtPayload {
 export default function LoginPage() {
   const router = useRouter()
 
-  const handleSuccess = (credentialResponse: CredentialResponse) => {
+  const handleSuccess = async (credentialResponse: CredentialResponse) => {
     if (!credentialResponse.credential) {
       alert("Token inválido")
       return
     }
 
-    const decoded = jwtDecode<GoogleJwtPayload>(credentialResponse.credential)
+    const res = await fetch("/api/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: credentialResponse.credential }),
+    })
 
-    const userData = {
-      uid: decoded.sub,
-      nombre: decoded.name,
-      email: decoded.email,
-      foto_url: decoded.picture,
+    if (!res.ok) {
+      alert("Error al iniciar sesión")
+      return
     }
 
-    localStorage.setItem("user", JSON.stringify(userData))
+    const data = await res.json()
+    // Opcional: guardar datos básicos para UI
+    localStorage.setItem("user", JSON.stringify(data.user))
     router.push("/dashboard")
   }
 

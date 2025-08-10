@@ -5,10 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import type { Pedido } from "@/types/pedido"
+import Image from 'next/image'
 interface User {
-    nombre: string
-    // agrega otros campos si los usas (email, rol, etc.)
-  }
+  id?: number | string
+  name: string
+  email?: string
+  picture?: string
+}
+
 
 export default function DashboardPage() {
 
@@ -21,10 +25,8 @@ export default function DashboardPage() {
   })
 
   useEffect(() => {
-  const userData = localStorage.getItem("user")
-    if (userData) {
-      setUser(JSON.parse(userData) as User)
-    }
+    const userData = localStorage.getItem("user")
+    if (userData) setUser(JSON.parse(userData) as User)
 
     const clientes = JSON.parse(localStorage.getItem("clientes") || "[]") as unknown[]
     const productos = JSON.parse(localStorage.getItem("productos") || "[]") as unknown[]
@@ -41,12 +43,21 @@ export default function DashboardPage() {
     })
   }, [])
 
-  const saludo = user?.nombre ? user.nombre.split(" ")[0] : "Usuario"
+
+  const saludo = user?.name ? user.name.split(" ")[0] : "Usuario"
 
   return (
    <div className="space-y-6">
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold text-gray-800">¡Hola, {saludo}! 👋</h1>
+        <Image
+          src={user?.picture ?? "/avatar-placeholder.png"}
+          alt={user?.name ?? "Usuario"}
+          width={64}
+          height={64}
+          className="rounded-full"
+        />
+
         <p className="text-gray-600">¿Qué quieres hacer hoy?</p>
       </div>
 
