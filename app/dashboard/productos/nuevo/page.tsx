@@ -17,18 +17,45 @@ export default function NuevoProductoPage() {
     cantidad: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const productos = JSON.parse(localStorage.getItem("productos") || "[]")
-    const nuevoProducto = {
-      id: Date.now().toString(),
-      nombre: formData.nombre,
-      cantidad: Number.parseInt(formData.cantidad),
+    const nombre = formData.nombre.trim()
+    const cantidad = Number(formData.cantidad)
+
+    if (!nombre || !Number.isFinite(cantidad) || cantidad < 0) {
+      alert("Completa nombre y cantidad válidos")
+      return
     }
 
-    localStorage.setItem("productos", JSON.stringify([...productos, nuevoProducto]))
-    router.push("/dashboard/productos")
+    try {
+      const res = await fetch("/api/productos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // el backend ya lo guarda en lowercase y valida duplicados
+        body: JSON.stringify({ nombre, cantidad }),
+      })
+
+      if (res.status === 401) {
+        // No hay sesión -> ir a login
+        return router.replace("/")
+      }
+      if (res.status === 409) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error ?? "Ya existe un producto con ese nombre")
+        return
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error ?? "No se pudo crear el producto")
+        return
+      }
+
+      router.push("/dashboard/productos")
+    } catch (e) {
+      console.error(e)
+      alert("Error de red al crear producto")
+    }
   }
 
   return (
