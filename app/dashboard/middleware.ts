@@ -3,16 +3,30 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(req: NextRequest) {
-  if (req.nextUrl.pathname.startsWith("/dashboard")) {
-    const hasSession = req.cookies.get("session")?.value
-    if (!hasSession) {
+  const { pathname } = req.nextUrl
+
+  // Rutas que queremos proteger con cookie "session"
+  const protectedPaths = ["/dashboard"]
+
+  const isProtected = protectedPaths.some((p) =>
+    pathname === p || pathname.startsWith(`${p}/`)
+  )
+
+  if (isProtected) {
+    const token = req.cookies.get("session")?.value
+    if (!token) {
       const url = req.nextUrl.clone()
       url.pathname = "/"
-      url.searchParams.set("from", req.nextUrl.pathname)
+      // opcional: recordar a dónde quería ir
+      url.searchParams.set("from", pathname)
       return NextResponse.redirect(url)
     }
   }
+
   return NextResponse.next()
 }
 
-export const config = { matcher: ["/dashboard/:path*"] }
+// protege todas las subrutas de /dashboard
+export const config = {
+  matcher: ["/dashboard/:path*"],
+}
