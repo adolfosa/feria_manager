@@ -4,10 +4,11 @@ import { OAuth2Client } from "google-auth-library"
 import { SignJWT } from "jose"
 import mysqlPool from "@/lib/mysql"
 
-export const runtime = "nodejs" // necesario para mysql2
+export const runtime = "nodejs"
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 const AUTH_SECRET = new TextEncoder().encode(process.env.AUTH_SECRET)
+const isProd = process.env.NODE_ENV === "production"
 
 export async function POST(req: Request) {
   try {
@@ -17,13 +18,20 @@ export async function POST(req: Request) {
     }
 
     // 1) Verificar token con Google
-    const ticket = await client.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    })
-    const payload = ticket.getPayload()
+    let payload: any
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      })
+      payload = ticket.getPayload()
+    } catch (err: any) {
+      console.error("Google verifyIdToken error:", err?.message || err)
+      return NextResponse.json({ ok: false, error: "Google verification failed" }, { status: 401 })
+    }
+
     if (!payload) {
-      return NextResponse.json({ ok: false, error: "Invalid token" }, { status: 401 })
+      return NextResponse.json({ ok: false, error: "Invalid token payload" }, { status: 401 })
     }
 
     const { sub, name, email, picture } = payload
@@ -50,14 +58,18 @@ export async function POST(req: Request) {
         `SELECT id, name, email, picture FROM users WHERE google_sub = ? LIMIT 1`,
         [sub]
       )
-
       const user = Array.isArray(rows) ? (rows[0] as any) : null
       if (!user) {
         return NextResponse.json({ ok: false, error: "User fetch failed" }, { status: 500 })
       }
 
       // 3) Firmar cookie de sesión (JWT)
-      const jwt = await new SignJWT({ uid: user.id, email: user.email, name: user.name })
+      const jwt = await new SignJWT({
+        uid: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture, // 👈 añade esto si quieres mostrar foto sin otra query
+      })
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
         .setExpirationTime("7d")
@@ -66,7 +78,7 @@ export async function POST(req: Request) {
       const res = NextResponse.json({ ok: true, user })
       res.cookies.set("session", jwt, {
         httpOnly: true,
-        secure: true,
+        secure: isProd, // 👈 en localhost debe ser false, en prod true
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
