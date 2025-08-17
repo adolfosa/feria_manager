@@ -1,63 +1,62 @@
 // app/dashboard/page.tsx  (SERVER COMPONENT)
-import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import Image from "next/image"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
-type Pedido = {
-  id: number
-  estado: "Pendiente" | "Entregado" | "Cancelado"
+type ApiSession = {
+  ok: boolean
+  user?: { id: number; name?: string; email?: string; picture?: string | null }
 }
+type Pedido = { id: number; estado: "Pendiente" | "Entregado" | "Cancelado" }
 
-async function fetchJSON<T>(url: string): Promise<T> {
-  // En server components, fetch incluye cookies automáticamente
-  const res = await fetch(url, { cache: "no-store" })
-  if (!res.ok) {
-    // si 401, se puede lanzar para que el middleware vuelva a actuar
-    throw new Error(`Error ${res.status} en ${url}`)
-  }
+// Construye URL absoluta y reenvía cookies de la request
+async function fetchOrRedirect<T>(path: string): Promise<T> {
+  const h = await headers()
+  const host = h.get("host")
+  const protocol = process.env.NODE_ENV === "production" ? "https" : "http"
+  const url = `${protocol}://${host}${path}`
+
+  const cookie = h.get("cookie") ?? "" // reenviar cookie de sesión
+  const res = await fetch(url, { cache: "no-store", headers: { cookie } })
+
+  if (res.status === 401) redirect("/")
+  if (!res.ok) throw new Error(`Error ${res.status} en ${path}`)
   return res.json()
 }
 
 export default async function DashboardPage() {
-  // opcional: si guardaste user básico en la cookie/session, puedes leerlo de /api/session
-  let user: { name?: string; picture?: string } | null = null
-  try {
-    const sessionRes = await fetchJSON<{ ok: boolean; user?: any }>("/api/session")
-    if (sessionRes.ok) {
-      user = sessionRes.user ?? null
-    }
-  } catch {
-    // si falla, user queda null (no es crítico para mostrar el saludo)
-  }
+  // 1) Sesión obligatoria
+  const session = await fetchOrRedirect<ApiSession>("/api/session")
+  if (!session.ok || !session.user) redirect("/")
+  const user = session.user
+  const saludo = user.name ? user.name.split(" ")[0] : "Usuario"
 
-  // lee estadísticas desde tus endpoints (DB)
-  // asumiendo que ya tienes /api/clientes y /api/productos adaptados a user_id
+  // 2) Datos reales desde DB
   const [clientes, productos] = await Promise.all([
-    fetchJSON<any[]>("/api/clientes").catch(() => []),
-    fetchJSON<any[]>("/api/productos").catch(() => []),
+    fetchOrRedirect<any[]>("/api/clientes").catch(() => []),
+    fetchOrRedirect<any[]>("/api/productos").catch(() => []),
   ])
-
-  // si ya tienes /api/pedidos, úsalo; si no, deja 0 y luego lo conectas
-  const pedidos: Pedido[] = await fetchJSON<Pedido[]>("/api/pedidos").catch(() => [])
+  const pedidos: Pedido[] = await fetchOrRedirect<Pedido[]>("/api/pedidos").catch(() => [])
 
   const pedidosPendientes = pedidos.filter((p) => p.estado === "Pendiente").length
   const pedidosEntregados = pedidos.filter((p) => p.estado === "Entregado").length
-
-  const saludo = user?.name ? user.name.split(" ")[0] : "Usuario"
 
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold text-gray-800">¡Hola, {saludo}! 👋</h1>
-        <Image
-          src={user?.picture ?? "/avatar-placeholder.png"}
-          alt={user?.name ?? "Usuario"}
-          width={64}
-          height={64}
-          className="rounded-full mx-auto"
-        />
+        <div className="flex flex-col items-center gap-2">
+          <Image
+            src={user.picture ?? "/avatar-placeholder.png"}
+            alt={user.name ?? "Usuario"}
+            width={64}
+            height={64}
+            className="rounded-full mx-auto"
+          />
+        </div>
         <p className="text-gray-600">¿Qué quieres hacer hoy?</p>
       </div>
 
@@ -76,22 +75,13 @@ export default async function DashboardPage() {
           </Button>
 
           <div className="grid grid-cols-2 gap-4">
-            <Button
-              asChild
-              variant="outline"
-              className="h-16 border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-xl"
-            >
+            <Button asChild variant="outline" className="h-16 border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-xl">
               <Link href="/dashboard/clientes/nuevo" className="flex flex-col items-center gap-1">
                 <span className="text-2xl">👥</span>
                 <span className="text-sm font-medium">Nuevo Cliente</span>
               </Link>
             </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="h-16 border-2 border-purple-200 bg-purple-50 hover:bg-purple-100 rounded-xl"
-            >
+            <Button asChild variant="outline" className="h-16 border-2 border-purple-200 bg-purple-50 hover:bg-purple-100 rounded-xl">
               <Link href="/dashboard/productos/nuevo" className="flex flex-col items-center gap-1">
                 <span className="text-2xl">📦</span>
                 <span className="text-sm font-medium">Nuevo Producto</span>
@@ -108,8 +98,7 @@ export default async function DashboardPage() {
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-blue-700 flex items-center gap-2">
-                <span>👥</span>
-                Clientes
+                <span>👥</span> Clientes
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -121,8 +110,7 @@ export default async function DashboardPage() {
           <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-purple-700 flex items-center gap-2">
-                <span>📦</span>
-                Productos
+                <span>📦</span> Productos
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -134,8 +122,7 @@ export default async function DashboardPage() {
           <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-orange-700 flex items-center gap-2">
-                <span>⏳</span>
-                Pendientes
+                <span>⏳</span> Pendientes
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -147,8 +134,7 @@ export default async function DashboardPage() {
           <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-md">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-green-700 flex items-center gap-2">
-                <span>✅</span>
-                Entregados
+                <span>✅</span> Entregados
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -158,15 +144,6 @@ export default async function DashboardPage() {
           </Card>
         </div>
       </div>
-
-      {/* Mensaje motivacional */}
-      <Card className="bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
-        <CardContent className="text-center py-6">
-          <div className="text-3xl mb-2">🌟</div>
-          <p className="text-gray-700 font-medium">¡Tu negocio está creciendo!</p>
-          <p className="text-sm text-gray-600 mt-1">Sigue así, cada pedido cuenta</p>
-        </CardContent>
-      </Card>
     </div>
   )
 }
