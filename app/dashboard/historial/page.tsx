@@ -1,35 +1,65 @@
+// app/dashboard/historial/page.tsx
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { Pedido } from "@/types/pedido"
 
+type Cliente = { id: number; nombre: string }
+
 const formatearFecha = (fecha: string) => {
-  const [year, month, day] = fecha.split("-")
-  return `${day}-${month}-${year}`
+  const [y, m, d] = fecha.split("-")
+  return `${d}-${m}-${y}`
 }
 
 export default function HistorialPage() {
+  const router = useRouter()
   const [pedidos, setPedidos] = useState<Pedido[]>([])
-  const [clientes, setClientes] = useState<any[]>([])
-  const [filtroCliente, setFiltroCliente] = useState("")
-  const [filtroEstado, setFiltroEstado] = useState("")
+  const [clientes, setClientes] = useState<Cliente[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Filtros (usar "all" como valor para "todos")
+  const [filtroCliente, setFiltroCliente] = useState<string>("all")
+  const [filtroEstado, setFiltroEstado] = useState<string>("all")
+
+  const load = async () => {
+    try {
+      setLoading(true)
+      const [rp, rc] = await Promise.all([
+        fetch("/api/pedidos", { cache: "no-store" }),
+        fetch("/api/clientes", { cache: "no-store" }),
+      ])
+      if (rp.status === 401 || rc.status === 401) return router.replace("/")
+
+      if (!rp.ok) throw new Error("No se pudieron cargar los pedidos")
+      if (!rc.ok) throw new Error("No se pudieron cargar los clientes")
+
+      const pedidosData = (await rp.json()) as Pedido[]
+      const clientesData = (await rc.json()) as Cliente[]
+
+      setPedidos(pedidosData)
+      setClientes(clientesData)
+    } catch (e) {
+      console.error(e)
+      alert("Error al cargar historial")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const pedidosGuardados = localStorage.getItem("pedidos")
-    const clientesGuardados = localStorage.getItem("clientes")
-
-    if (pedidosGuardados) setPedidos(JSON.parse(pedidosGuardados))
-    if (clientesGuardados) setClientes(JSON.parse(clientesGuardados))
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const pedidosFiltrados = pedidos.filter((pedido) => {
-    const cumpleFiltroCliente = !filtroCliente || pedido.clienteId === filtroCliente
-    const cumpleFiltroEstado = !filtroEstado || pedido.estado === filtroEstado
-    return cumpleFiltroCliente && cumpleFiltroEstado
+  const pedidosFiltrados = pedidos.filter((p) => {
+    const clienteOk = filtroCliente === "all" || String(p.cliente_id) === filtroCliente
+    const estadoOk = filtroEstado === "all" || p.estado === filtroEstado
+    return clienteOk && estadoOk
   })
 
   const getEstadoBadge = (estado: string) => {
@@ -46,8 +76,8 @@ export default function HistorialPage() {
   }
 
   const limpiarFiltros = () => {
-    setFiltroCliente("")
-    setFiltroEstado("")
+    setFiltroCliente("all")
+    setFiltroEstado("all")
   }
 
   const totalPedidos = pedidos.length
@@ -113,7 +143,7 @@ export default function HistorialPage() {
               <SelectContent>
                 <SelectItem value="all">Todos los clientes</SelectItem>
                 {clientes.map((cliente) => (
-                  <SelectItem key={cliente.id} value={cliente.id}>
+                  <SelectItem key={cliente.id} value={String(cliente.id)}>
                     {cliente.nombre}
                   </SelectItem>
                 ))}
@@ -149,45 +179,57 @@ export default function HistorialPage() {
       {/* Lista de pedidos */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-700 px-2">
-          {pedidosFiltrados.length} pedido{pedidosFiltrados.length !== 1 ? "s" : ""} encontrado
-          {pedidosFiltrados.length !== 1 ? "s" : ""}
+          {loading
+            ? "Cargando..."
+            : `${pedidosFiltrados.length} pedido${pedidosFiltrados.length !== 1 ? "s" : ""} encontrado${
+                pedidosFiltrados.length !== 1 ? "s" : ""
+              }`}
         </h2>
 
-        {pedidosFiltrados.length === 0 ? (
+        {loading ? (
+          <Card className="text-center py-12 bg-gray-50">
+            <CardContent>
+              <div className="animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/3 mx-auto mb-3" />
+                <div className="h-6 bg-gray-200 rounded w-1/2 mx-auto" />
+              </div>
+            </CardContent>
+          </Card>
+        ) : pedidosFiltrados.length === 0 ? (
           <Card className="text-center py-12 bg-gray-50">
             <CardContent>
               <div className="text-6xl mb-4">🔍</div>
               <p className="text-gray-600 text-lg">
-                {totalPedidos === 0 ? "Aún no tienes pedidos" : "No encontré pedidos con esos filtros"}
+                {pedidos.length === 0 ? "Aún no tienes pedidos" : "No encontré pedidos con esos filtros"}
               </p>
               <p className="text-gray-500 text-sm mt-2">
-                {totalPedidos === 0 ? "¡Registra tu primera venta!" : "Intenta cambiar los filtros"}
+                {pedidos.length === 0 ? "¡Registra tu primera venta!" : "Intenta cambiar los filtros"}
               </p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-3">
             {pedidosFiltrados
-              .sort((a, b) => new Date(b.fechaEntrega).getTime() - new Date(a.fechaEntrega).getTime())
+              .sort((a, b) => new Date(b.fecha_entrega).getTime() - new Date(a.fecha_entrega).getTime())
               .map((pedido) => (
                 <Card key={pedido.id} className="shadow-md">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg text-gray-800 flex items-center justify-between">
-                      <span>{pedido.clienteNombre}</span>
+                      <span>{pedido.cliente_nombre}</span>
                       {getEstadoBadge(pedido.estado)}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex items-center gap-2 text-gray-600">
                       <span>📦</span>
-                      <span>{pedido.productoNombre}</span>
+                      <span>{pedido.producto_nombre}</span>
                       <Badge variant="outline" className="ml-auto">
                         {pedido.cantidad} unidades
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-gray-600">
                       <span>📅</span>
-                      <span>Entrega: {formatearFecha(pedido.fechaEntrega)}</span>
+                      <span>Entrega: {formatearFecha(pedido.fecha_entrega)}</span>
                     </div>
                   </CardContent>
                 </Card>
