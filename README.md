@@ -1,3 +1,6 @@
+sudo mysql -u root
+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
+
 # feria_manager
 Aplicación para la gestión de pedidos y stock de productos
 
